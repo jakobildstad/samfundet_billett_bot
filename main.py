@@ -13,6 +13,12 @@ import time, logging, pathlib
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
+IKKE_MEDLEM_QTY = 9
+MEDLEM_QTY = 4
+EMAIL = "jakobildstad@gmail.com"
+DROP_TIME = "2025-08-12T13:59:58+02:00" # 2 seconds before 14:00
+DROP_URL = "https://www.samfundet.no/arrangement/4596-toga-hele-huset" # Event URL
+
 def open_event_when_live(url: str, onsale_iso: str, chrome_profile_dir: str | None = None):
     """Opens the event page exactly at on-sale time using your persistent Chrome profile.
     Automates the purchasing process up to the payment step."""
@@ -93,7 +99,7 @@ def open_event_when_live(url: str, onsale_iso: str, chrome_profile_dir: str | No
             raise Exception("Could not find purchase form modal after 10 attempts")
 
         # 3) Select tickets: 4 Medlem + 9 Ikke-medlem (works for any event) - AGGRESSIVE
-        # First select 4 for Medlem with retry
+        # First select 4 for Medlem with retry and fallback quantities
         for medlem_attempt in range(3):
             try:
                 medlem_select = form.find_element(
@@ -101,16 +107,25 @@ def open_event_when_live(url: str, onsale_iso: str, chrome_profile_dir: str | No
                     './/tr[contains(@class,"price-group-row")][.//td[1][contains(normalize-space(.),"Medlem")]]'
                     '//select[contains(@id,"price_") and contains(@id,"_count")]'
                 )
-                Select(medlem_select).select_by_value("4")
-                logging.info("✅ Selected 4 tickets for Medlem")
-                break
+                # Try quantities from 4 down to 1
+                selected = False
+                for qty in range(MEDLEM_QTY, 0, -1):  # Try 4, 3, 2, 1
+                    try:
+                        Select(medlem_select).select_by_value(str(qty))
+                        logging.info(f"✅ Selected {qty} tickets for Medlem")
+                        selected = True
+                        break
+                    except:
+                        continue
+                if selected:
+                    break
             except Exception as e:
                 if medlem_attempt == 2:
                     logging.warning(f"❌ Could not select Medlem tickets after 3 attempts: {e}")
                 else:
                     time.sleep(0.5)
         
-        # Then select 9 for Ikke-medlem with retry
+        # Then select 9 for Ikke-medlem with retry and fallback quantities
         for ikke_medlem_attempt in range(3):
             try:
                 ikke_medlem_select = form.find_element(
@@ -118,9 +133,18 @@ def open_event_when_live(url: str, onsale_iso: str, chrome_profile_dir: str | No
                     './/tr[contains(@class,"price-group-row")][.//td[1][contains(normalize-space(.),"Ikke-medlem")]]'
                     '//select[contains(@id,"price_") and contains(@id,"_count")]'
                 )
-                Select(ikke_medlem_select).select_by_value("9")
-                logging.info("✅ Selected 9 tickets for Ikke-medlem")
-                break
+                # Try quantities from 9 down to 1
+                selected = False
+                for qty in range(IKKE_MEDLEM_QTY, 0, -1):  # Try 9, 8, 7, 6, 5, 4, 3, 2, 1
+                    try:
+                        Select(ikke_medlem_select).select_by_value(str(qty))
+                        logging.info(f"✅ Selected {qty} tickets for Ikke-medlem")
+                        selected = True
+                        break
+                    except:
+                        continue
+                if selected:
+                    break
             except Exception as e:
                 if ikke_medlem_attempt == 2:
                     logging.warning(f"❌ Could not select Ikke-medlem tickets after 3 attempts: {e}")
@@ -134,7 +158,7 @@ def open_event_when_live(url: str, onsale_iso: str, chrome_profile_dir: str | No
                     (By.CSS_SELECTOR, 'input#email[name="email"]')
                 ))
                 email_input.clear()
-                email_input.send_keys("jakobildstad@gmail.com")
+                email_input.send_keys(EMAIL)
                 logging.info("✅ Filled email address")
                 break
             except Exception as e:
@@ -185,14 +209,7 @@ def open_event_when_live(url: str, onsale_iso: str, chrome_profile_dir: str | No
 if __name__ == "__main__":
     # FOR ACTUAL EVENT - 5 seconds before 14:00
     open_event_when_live(
-        url="https://www.samfundet.no/arrangement/4596-toga-hele-huset",
-        onsale_iso="2025-08-12T13:59:58+02:00",  # 2 seconds before 14:00
+        url=DROP_URL,
+        onsale_iso=DROP_TIME,  # 2 seconds before 14:00
         chrome_profile_dir=None  # No profile needed - use fresh browser
     )
-    # https://www.samfundet.no/arrangement/4572-silent-disco
-    # https://www.samfundet.no/arrangement/4596-toga-hele-huset
-
-    # "2025-08-12T14:00:00+02:00"
-
-    # 5 sec before
-    # "2025-08-12T14:00:00+02:00"
